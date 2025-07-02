@@ -55,15 +55,53 @@ jobs:
       run: |
         echo "DATE_TAG=$(TZ='Asia/Tokyo' date +'%Y%m%d%H%M%S')" >> $GITHUB_OUTPUT
 
-    - name: マルチプラットフォームDockerイメージのビルド
+    - name: AMD64用Dockerイメージのビルドとプッシュ
+      if: ${{ steps.check_act.outputs.is_act == 'false' }}
       uses: docker/build-push-action@v5
       with:
         context: .
-        platforms: linux/amd64,linux/arm64
-        push: ${{ steps.check_act.outputs.is_act == 'false' }}
-        load: ${{ steps.check_act.outputs.is_act == 'true' }}
+        platforms: linux/amd64
+        push: true
         tags: |
-          ghcr.io/${{ github.repository }}:latest
-          ghcr.io/${{ github.repository }}:${{ steps.generate_tag.outputs.DATE_TAG }}
+          ghcr.io/${{ github.repository }}:latest-amd64
+          ghcr.io/${{ github.repository }}:${{ steps.generate_tag.outputs.DATE_TAG }}-amd64
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: ARM64用Dockerイメージのビルドとプッシュ
+      if: ${{ steps.check_act.outputs.is_act == 'false' }}
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/arm64
+        push: true
+        tags: |
+          ghcr.io/${{ github.repository }}:latest-arm64
+          ghcr.io/${{ github.repository }}:${{ steps.generate_tag.outputs.DATE_TAG }}-arm64
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: マルチアーキテクチャマニフェストの作成とプッシュ
+      if: ${{ steps.check_act.outputs.is_act == 'false' }}
+      run: |
+        docker manifest create ghcr.io/${{ github.repository }}:latest \
+          ghcr.io/${{ github.repository }}:latest-amd64 \
+          ghcr.io/${{ github.repository }}:latest-arm64
+        docker manifest push ghcr.io/${{ github.repository }}:latest
+
+        docker manifest create ghcr.io/${{ github.repository }}:${{ steps.generate_tag.outputs.DATE_TAG }} \
+          ghcr.io/${{ github.repository }}:${{ steps.generate_tag.outputs.DATE_TAG }}-amd64 \
+          ghcr.io/${{ github.repository }}:${{ steps.generate_tag.outputs.DATE_TAG }}-arm64
+        docker manifest push ghcr.io/${{ github.repository }}:${{ steps.generate_tag.outputs.DATE_TAG }}
+
+    - name: act用Dockerイメージのビルドとロード (ローカル)
+      if: ${{ steps.check_act.outputs.is_act == 'true' }}
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64 # actでは両方ビルドしてロード
+        push: false
+        load: true
+        tags: hello-world:latest # actではローカルタグ
         cache-from: type=gha
         cache-to: type=gha,mode=max
