@@ -121,15 +121,17 @@ jobs:
           run: |
             # マニフェストの作成を行います。
             # ここでは、linux/amd64とlinux/arm64のイメージをまとめて1つのマニフェストにします。
+            # まず、日付タグのマニフェストリストを作成し、プッシュします。
             docker manifest create ghcr.io/${{ github.repository }}:${{ needs.make_serial.outputs.serial }} \
             ghcr.io/${{ github.repository }}:${{ needs.make_serial.outputs.serial }}-amd64 \
             ghcr.io/${{ github.repository }}:${{ needs.make_serial.outputs.serial }}-arm64
-            docker manifest create ghcr.io/${{ github.repository }}:latest \
-            ghcr.io/${{ github.repository }}:${{ needs.make_serial.outputs.serial }}-amd64 \
-            ghcr.io/${{ github.repository }}:${{ needs.make_serial.outputs.serial }}-arm64
-            # マニフェストのプッシュを行います。
             docker manifest push ghcr.io/${{ github.repository }}:${{ needs.make_serial.outputs.serial }}
-            docker manifest push ghcr.io/${{ github.repository }}:latest
+
+            # 次に、latestタグを、上記で作成した日付タグのマニフェストリストに紐付けます。
+            # これにより、latestタグは日付タグのマニフェストリストを参照するようになります。
+            docker manifest create ghcr.io/${{ github.repository }}:latest \
+            ghcr.io/${{ github.repository }}:${{ needs.make_serial.outputs.serial }}
+            docker manifest push --amend ghcr.io/${{ github.repository }}:latest
 
     clean:
         # actで実行していたときは、作ったローカルイメージは削除しておきます
