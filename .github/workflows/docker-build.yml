@@ -7,20 +7,23 @@ on:
   pull_request:
     branches:
       - main
-  workflow_dispatch: # ワークフローを手動で実行できるように追加
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04 # ubuntu-latestからubuntu-24.04に変更
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
 
     outputs:
       is_act: ${{ steps.check_act.outputs.is_act }}
 
     steps:
-    - name: リポジトリのチェックアウト # ステップ名を日本語化
+    - name: リポジトリのチェックアウト
       uses: actions/checkout@v4
 
-    - name: actでの実行を判別 # actでの実行かどうかを判別
+    - name: actでの実行を判別
       id: check_act
       run: |
         if [ -n "${{ env.ACT }}" ]; then
@@ -31,15 +34,15 @@ jobs:
           echo "is_act=false" >> $GITHUB_OUTPUT
         fi
 
-    - name: Docker向けQEMUのセットアップ # マルチアーキテクチャビルドのためにQEMUをセットアップ
+    - name: Docker向けQEMUのセットアップ
       uses: docker/setup-qemu-action@v2
       with:
         platforms: linux/amd64,linux/arm64
 
-    - name: Docker Buildxのセットアップ # ステップ名を日本語化
+    - name: Docker Buildxのセットアップ
       uses: docker/setup-buildx-action@v3
 
-    - name: Dockerログイン (ghcr.io) # actではない場合のみghcr.ioにログイン
+    - name: Dockerログイン (ghcr.io)
       if: ${{ steps.check_act.outputs.is_act == 'false' }}
       uses: docker/login-action@v3
       with:
@@ -47,18 +50,18 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: 日付タグの生成 # 日本時間を基準とした日付タグを生成
+    - name: 日付タグの生成
       id: generate_tag
       run: |
         echo "DATE_TAG=$(TZ='Asia/Tokyo' date +'%Y%m%d%H%M%S')" >> $GITHUB_OUTPUT
 
-    - name: マルチプラットフォームDockerイメージのビルド # ステップ名を日本語化
+    - name: マルチプラットフォームDockerイメージのビルド
       uses: docker/build-push-action@v5
       with:
         context: .
         platforms: linux/amd64,linux/arm64
-        push: ${{ steps.check_act.outputs.is_act == 'false' }} # actではない場合はプッシュ
-        load: ${{ steps.check_act.outputs.is_act == 'true' }} # actの場合はロード
+        push: ${{ steps.check_act.outputs.is_act == 'false' }}
+        load: ${{ steps.check_act.outputs.is_act == 'true' }}
         tags: |
           ghcr.io/${{ github.repository }}:latest
           ghcr.io/${{ github.repository }}:${{ steps.generate_tag.outputs.DATE_TAG }}
