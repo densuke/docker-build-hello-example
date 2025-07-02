@@ -129,8 +129,13 @@ jobs:
 
             # 次に、latestタグを、上記で作成した日付タグのマニフェストリストに紐付けます。
             # これにより、latestタグは日付タグのマニフェストリストを参照するようになります。
-            docker manifest create ghcr.io/${{ github.repository }}:latest             ghcr.io/${{ github.repository }}:${{ needs.make_serial.outputs.serial }}
-            docker manifest push --force ghcr.io/${{ github.repository }}:latest
+            SERIAL_TAG=ghcr.io/${{ github.repository }}:${{ needs.make_serial.outputs.serial }}
+            docker manifest create ${SERIAL_TAG} ${SERIAL_TAG}-amd64 ${SERIAL_TAG}-arm64
+            docker manifest push ${SERIAL_TAG}
+            sleep 10 # レジストリへの反映を待つ
+
+            docker manifest create --amend ghcr.io/${{ github.repository }}:latest ${SERIAL_TAG}
+            docker manifest push ghcr.io/${{ github.repository }}:latest
 
     clean:
         # actで実行していたときは、作ったローカルイメージは削除しておきます
